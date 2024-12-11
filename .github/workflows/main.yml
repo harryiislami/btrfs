@@ -6,6 +6,7 @@ jobs:
   cmake:
     runs-on: msvc-wine
     container:
+      image: ubuntu:latest  # Replace with your desired image
       volumes:
         - /var/run/pcscd/pcscd.comm:/var/run/pcscd/pcscd.comm
     steps:
