@@ -7,8 +7,9 @@ env:
 
 jobs:
   cmake:
-    runs-on: msvc-wine
+    runs-on: ubuntu-latest  # Change this to a suitable runner if needed
     container:
+      image: mcr.microsoft.com/windows/servercore:ltsc2019  # Use a valid Windows container image
       volumes:
         - /var/run/pcscd/pcscd.comm:/var/run/pcscd/pcscd.comm
 
