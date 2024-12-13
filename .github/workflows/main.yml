@@ -1,61 +1,29 @@
-   name: build
-   on: [push]
-   env:
-      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/eselect/wine/bin
-   jobs:
-     cmake:
-       runs-on: windows-latest  # Use a Windows runner
-       steps:
-         - run: echo "SHORT_SHA=`echo ${{ github.sha }} | cut -c1-8`" >> $GITHUB_ENV
-         - run: git clone --recurse-submodules -j`nproc` ${{ github.server_url }}/${{ github.repository }} ${SHORT_SHA}
-         - run: cd ${SHORT_SHA} && git checkout ${{ github.sha }}
-         - run: mkdir -p build/debug/{amd64,x86,aarch64,arm}
-         - run: mkdir -p build/release/{amd64,x86,aarch64,arm}
-         - run: mkdir -p build/pdb/{debug,release}/{amd64,x86,aarch64,arm}
-         - run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-amd64.cmake -DCMAKE_BUILD_TYPE=Debug -DWITH_TEST=OFF -S ${SHORT_SHA} -B build/debug/amd64 && cmake --build build/debug/amd64 --parallel `nproc`
-         - run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-x86.cmake -DCMAKE_BUILD_TYPE=Debug -DWITH_TEST=OFF -S ${SHORT_SHA} -B build/debug/x86 && cmake --build build/debug/x86 --parallel `nproc`
-         - run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-aarch64.cmake -DCMAKE_BUILD_TYPE=Debug -DWITH_TEST=OFF -S ${SHORT_SHA} -B build/debug/aarch64 && cmake --build build/debug/aarch64 --parallel `nproc`
-         - run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-armv7.cmake -DCMAKE_BUILD_TYPE=Debug -DWITH_TEST=OFF -S ${SHORT_SHA} -B build/debug/arm && cmake --build build/debug/arm --parallel `nproc`
-         - run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-amd64.cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_TEST=OFF -S ${SHORT_SHA} -B build/release/amd64 && cmake --build build/release/amd64 --parallel `nproc`
-         - run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-x86.cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_TEST=OFF -S ${SHORT_SHA} -B build/release/x86 && cmake --build build/release/x86 --parallel `nproc`
-         - run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-aarch64.cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_TEST=OFF -S ${SHORT_SHA} -B build/release/aarch64 && cmake --build build/release/aarch64 --parallel `nproc`
-         - run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-armv7.cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_TEST=OFF -S ${SHORT_SHA} -B build/release/arm && cmake --build build/release/arm --parallel `nproc`
-         - run: mv build/debug/amd64/*.pdb build/pdb/debug/amd64/
-         - run: mv build/debug/x86/*.pdb build/pdb/debug/x86/
-         - run: mv build/debug/aarch64/*.pdb build/pdb/debug/aarch64/
-         - run: mv build/debug/arm/*.pdb build/pdb/debug/arm/
-         - run: mv build/release/amd64/*.pdb build/pdb/release/amd64/
-         - run: mv build/release/x86/*.pdb build/pdb/release/x86/
-         - run: mv build/release/aarch64/*.pdb build/pdb/release/aarch64/
-         - run: mv build/release/arm/*.pdb build/pdb/release/arm/
-         - run: cp ${SHORT_SHA}/src/{btrfs,btrfs-vol}.inf build/debug/
-         - run: cp ${SHORT_SHA}/src/{btrfs,btrfs-vol}.inf build/release/
-         - run: stampinf -f build/debug/btrfs.inf -d \* -v \*
-         - run: stampinf -f build/debug/btrfs-vol.inf -d \* -v \*
-         - run: stampinf -f build/release/btrfs.inf -d \* -v \*
-         - run: stampinf -f build/release/btrfs-vol.inf -d \* -v \*
-         - run: cd build/debug && makecat ../../${SHORT_SHA}/src/btrfs.cdf
-         - run: cd build/release && makecat ../../${SHORT_SHA}/src/btrfs.cdf
-         - env:
-             CERTIFICATE: ${{ secrets.CERTIFICATE }}
-           run: echo "${CERTIFICATE}" > codesigning.crt
-         - env:
-             PKCS11CERT: ${{ secrets.PKCS11CERT }}
-             PKCS11KEY: ${{ secrets.PKCS11KEY }}
-           run: for i in build/{debug,release}/btrfs.cat; do osslsigncode sign -pkcs11module /usr/lib64/libcrypto3PKCS.so -pkcs11cert "${PKCS11CERT}" -key "${PKCS11KEY}" -certs codesigning.crt -t http://timestamp.digicert.com -in $i -out tmp && mv tmp $i; done
-         - env:
-             PKCS11CERT: ${{ secrets.PKCS11CERT }}
-             PKCS11KEY: ${{ secrets.PKCS11KEY }}
-           run: for i in build/{debug,release}/{amd64,x86,aarch64,arm}/{btrfs.sys,mkbtrfs.exe,shellbtrfs.dll,ubtrfs.dll}; do osslsigncode sign -pkcs11module /usr/lib64/libcrypto3PKCS.so -pkcs11cert "${PKCS11CERT}" -key "${PKCS11KEY}" -certs codesigning.crt -t http://timestamp.digicert.com -ph -in $i -out tmp && mv tmp $i; done
-         - uses: actions/upload-artifact@v3
-           with:
-             name: ${{ github.sha }}
-             overwrite: true
-             path: |
-               build/**/btrfs.sys
-               build/**/mkbtrfs.exe
-               build/**/shellbtrfs.dll
-               build/**/ubtrfs.dll
-               build/**/*.inf
-               build/**/*.cat
-               build/pdb
+name: Build WinBtrfs
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: msvc-wine
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up CMake
+        run: cmake --version  # Ensure CMake is available
+
+      - name: Create Build Directory
+        run: mkdir -p build/amd64
+
+      - name: Configure CMake
+        run: cmake -DCMAKE_TOOLCHAIN_FILE=msvc-amd64.cmake -DCMAKE_BUILD_TYPE=Release -S . -B build/amd64
+
+      - name: Build
+        run: cmake --build build/amd64 --parallel `nproc`
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: winbtrfs-amd64
+          path: build/amd64/*.sys
