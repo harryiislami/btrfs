@@ -4,10 +4,7 @@ env:
    PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/etc/eselect/wine/bin
 jobs:
   cmake:
-    runs-on: msvc-wine
-    container:
-      volumes:
-        - /var/run/pcscd/pcscd.comm:/var/run/pcscd/pcscd.comm
+    runs-on: ubuntu-latest  # Use the default free GitHub Actions runner
     steps:
       - run: echo "SHORT_SHA=`echo ${{ github.sha }} | cut -c1-8`" >> $GITHUB_ENV
       - run: git clone --recurse-submodules -j`nproc` ${{ github.server_url }}/${{ github.repository }} ${SHORT_SHA}
