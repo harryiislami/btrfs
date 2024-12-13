@@ -7,11 +7,7 @@ env:
 
 jobs:
   cmake:
-    runs-on: ubuntu-latest  # Change this to a suitable runner if needed
-    container:
-      image: mcr.microsoft.com/windows/servercore:ltsc2019  # Use a valid Windows container image
-      volumes:
-        - /var/run/pcscd/pcscd.comm:/var/run/pcscd/pcscd.comm
+    runs-on: windows-latest  # Use a Windows runner
 
     steps:
       - run: echo "SHORT_SHA=`echo ${{ github.sha }} | cut -c1-8`" >> $GITHUB_ENV
